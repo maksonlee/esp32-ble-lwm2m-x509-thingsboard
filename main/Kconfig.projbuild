@@ -1,0 +1,47 @@
+menu "Application Configuration"
+
+config LWM2M_SERVER_URI
+    string "LwM2M server URI"
+    default "coaps://thingsboard.example.com:5686"
+    help
+        Replace the example hostname with your server. DTLS is required.
+        Use the hostname in the server certificate.
+
+config LWM2M_ENDPOINT
+    string "LwM2M endpoint and device certificate CN"
+    default "esp32-dht11-01"
+    help
+        Must match the existing ThingsBoard endpoint and device certificate CN.
+
+config DHT11_GPIO
+    int "DHT11 data GPIO"
+    range 0 33
+    default 23
+    help
+        Select an available output-capable GPIO. Do not use flash, UART,
+        or boot-strapping pins without checking the board wiring.
+
+config TIME_SERVER
+    string "NTP server used before TLS startup"
+    default "time.cloudflare.com"
+    help
+        Use a reachable internal NTP service here if public UDP/123 is blocked.
+        LwM2M remains stopped until initial synchronization succeeds.
+
+config REPROVISION_GPIO
+    int "Active-low Wi-Fi reset button GPIO"
+    range 0 33
+    default 0
+    help
+        The ESP32 BOOT button uses GPIO 0. After boot, hold for five seconds
+        to clear only Wi-Fi configuration and restart into BLE provisioning.
+
+config TELEMETRY_INTERVAL_SECONDS
+    int "Sensor sampling and telemetry interval (seconds)"
+    range 3 3600
+    default 5
+    help
+        DHT11 reads must be more than two seconds apart. Failed samples are
+        skipped; the same interval applies before trying again.
+
+endmenu

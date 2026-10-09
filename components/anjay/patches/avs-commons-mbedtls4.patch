@@ -1,0 +1,264 @@
+diff --git a/src/crypto/mbedtls/avs_mbedtls_data_loader.c b/src/crypto/mbedtls/avs_mbedtls_data_loader.c
+index 0e4792c..3b4500f 100644
+--- a/src/crypto/mbedtls/avs_mbedtls_data_loader.c
++++ b/src/crypto/mbedtls/avs_mbedtls_data_loader.c
+@@ -422,7 +422,7 @@ load_private_key_from_buffer(mbedtls_pk_context *client_key,
+                              size_t len,
+                              const char *password,
+                              avs_crypto_prng_ctx_t *prng_ctx) {
+-#        if MBEDTLS_VERSION_NUMBER >= 0x03000000
++#        if MBEDTLS_VERSION_NUMBER >= 0x03000000 && MBEDTLS_VERSION_NUMBER < 0x04000000
+     avs_crypto_mbedtls_prng_cb_t *random_cb = NULL;
+     void *random_cb_arg = NULL;
+     if (_avs_crypto_prng_get_random_cb(prng_ctx, &random_cb, &random_cb_arg)) {
+@@ -439,7 +439,7 @@ load_private_key_from_buffer(mbedtls_pk_context *client_key,
+             mbedtls_pk_parse_key(client_key, (const unsigned char *) buffer,
+                                  len, pwd, pwd_len
+ #        if MBEDTLS_VERSION_NUMBER \
+-                >= 0x03000000 // mbed TLS 3.0 added RNG arguments
++                >= 0x03000000 && MBEDTLS_VERSION_NUMBER < 0x04000000
+                                  ,
+                                  random_cb, random_cb_arg
+ #        endif // MBEDTLS_VERSION_NUMBER >= 0x03000000
+@@ -461,7 +461,7 @@ load_private_key_from_buffer(mbedtls_pk_context *client_key,
+         result = mbedtls_pk_parse_key(client_key, refined_buffer, len + 1, pwd,
+                                       pwd_len
+ #        if MBEDTLS_VERSION_NUMBER \
+-                >= 0x03000000 // mbed TLS 3.0 added RNG arguments
++                >= 0x03000000 && MBEDTLS_VERSION_NUMBER < 0x04000000
+                                       ,
+                                       random_cb, random_cb_arg
+ #        endif // MBEDTLS_VERSION_NUMBER >= 0x03000000
+@@ -476,7 +476,7 @@ static avs_error_t load_private_key_from_file(mbedtls_pk_context *client_key,
+                                               const char *filename,
+                                               const char *password,
+                                               avs_crypto_prng_ctx_t *prng_ctx) {
+-#        if MBEDTLS_VERSION_NUMBER >= 0x03000000
++#        if MBEDTLS_VERSION_NUMBER >= 0x03000000 && MBEDTLS_VERSION_NUMBER < 0x04000000
+     avs_crypto_mbedtls_prng_cb_t *random_cb = NULL;
+     void *random_cb_arg = NULL;
+     if (_avs_crypto_prng_get_random_cb(prng_ctx, &random_cb, &random_cb_arg)) {
+@@ -494,7 +494,7 @@ static avs_error_t load_private_key_from_file(mbedtls_pk_context *client_key,
+     avs_error_t err =
+             ((retval = mbedtls_pk_parse_keyfile(client_key, filename, password
+ #            if MBEDTLS_VERSION_NUMBER \
+-                    >= 0x03000000 // mbed TLS 3.0 added RNG arguments
++                    >= 0x03000000 && MBEDTLS_VERSION_NUMBER < 0x04000000
+                                                 ,
+                                                 random_cb, random_cb_arg
+ #            endif // MBEDTLS_VERSION_NUMBER >= 0x03000000
+diff --git a/src/crypto/mbedtls/avs_mbedtls_private.h b/src/crypto/mbedtls/avs_mbedtls_private.h
+index 2d8d2ab..74d82f6 100644
+--- a/src/crypto/mbedtls/avs_mbedtls_private.h
++++ b/src/crypto/mbedtls/avs_mbedtls_private.h
+@@ -137,7 +137,31 @@ _avs_crypto_mbedtls_pk_check_pair(mbedtls_x509_crt *cert,
+     int result;
+ 
+ #    ifndef AVS_COMMONS_WITH_AVS_CRYPTO_PKI_ENGINE
+-#        if MBEDTLS_VERSION_NUMBER >= 0x03000000
++#        if MBEDTLS_VERSION_NUMBER >= 0x04000000
++    if (mbedtls_pk_get_key_type(pub) == PSA_KEY_TYPE_RSA_PUBLIC_KEY
++            && mbedtls_pk_get_key_type(prv) == PSA_KEY_TYPE_RSA_KEY_PAIR) {
++        /* TF-PSA-Crypto's PKCS#8 RSA parser may leave its cached public key
++         * empty. Exporting through the public API derives it from the private
++         * key; compare the complete SubjectPublicKeyInfo instead of relying
++         * on that cache. Export failures and mismatched keys remain fatal. */
++        unsigned char pub_der[MBEDTLS_PK_SIGNATURE_MAX_SIZE + 128];
++        unsigned char prv_der[MBEDTLS_PK_SIGNATURE_MAX_SIZE + 128];
++        int pub_len = mbedtls_pk_write_pubkey_der(pub, pub_der, sizeof(pub_der));
++        int prv_len = mbedtls_pk_write_pubkey_der(prv, prv_der, sizeof(prv_der));
++        if (pub_len < 0) {
++            return pub_len;
++        }
++        if (prv_len < 0) {
++            return prv_len;
++        }
++        return pub_len > 0 && pub_len == prv_len
++                       && !memcmp(pub_der + sizeof(pub_der) - pub_len,
++                                  prv_der + sizeof(prv_der) - prv_len,
++                                  (size_t) pub_len)
++                   ? 0 : MBEDTLS_ERR_PK_TYPE_MISMATCH;
++    }
++#        endif
++#        if MBEDTLS_VERSION_NUMBER >= 0x03000000 && MBEDTLS_VERSION_NUMBER < 0x04000000
+     result = mbedtls_pk_check_pair(pub, prv, f_rng, p_rng);
+ #        else  // MBEDTLS_VERSION_NUMBER >= 0x03000000
+     (void) f_rng;
+@@ -199,6 +223,7 @@ _avs_crypto_mbedtls_ssl_context_get_current_alert(mbedtls_ssl_context *ctx,
+     return 0;
+ }
+ 
++#    if MBEDTLS_VERSION_NUMBER < 0x04000000
+ static inline const mbedtls_cipher_info_t *
+ _avs_crypto_mbedtls_cipher_info_from_ciphersuite(
+         const mbedtls_ssl_ciphersuite_t *ciphersuite) {
+@@ -215,6 +240,7 @@ static inline unsigned int
+ _avs_crypto_mbedtls_cipher_get_block_size(const mbedtls_cipher_info_t *cipher) {
+     return cipher->MBEDTLS_PRIVATE(block_size);
+ }
++#    endif
+ 
+ #    if MBEDTLS_VERSION_NUMBER < 0x03020000
+ // mbedtls_ssl_is_handshake_over() has been introduced in Mbed TLS 3.2
+@@ -233,8 +259,10 @@ static inline int
+ mbedtls_ssl_ciphersuite_uses_psk(const mbedtls_ssl_ciphersuite_t *ciphersuite) {
+     switch (ciphersuite->MBEDTLS_PRIVATE(key_exchange)) {
+     case MBEDTLS_KEY_EXCHANGE_PSK:
++#        if MBEDTLS_VERSION_NUMBER < 0x04000000
+     case MBEDTLS_KEY_EXCHANGE_RSA_PSK:
+     case MBEDTLS_KEY_EXCHANGE_DHE_PSK:
++#        endif
+     case MBEDTLS_KEY_EXCHANGE_ECDHE_PSK:
+         return 1;
+     default:
+@@ -246,12 +274,14 @@ mbedtls_ssl_ciphersuite_uses_psk(const mbedtls_ssl_ciphersuite_t *ciphersuite) {
+ static inline int mbedtls_ssl_ciphersuite_uses_srv_cert(
+         const mbedtls_ssl_ciphersuite_t *ciphersuite) {
+     switch (ciphersuite->MBEDTLS_PRIVATE(key_exchange)) {
++#        if MBEDTLS_VERSION_NUMBER < 0x04000000
+     case MBEDTLS_KEY_EXCHANGE_RSA:
+     case MBEDTLS_KEY_EXCHANGE_RSA_PSK:
+     case MBEDTLS_KEY_EXCHANGE_DHE_RSA:
+     case MBEDTLS_KEY_EXCHANGE_ECDH_RSA:
+-    case MBEDTLS_KEY_EXCHANGE_ECDHE_RSA:
+     case MBEDTLS_KEY_EXCHANGE_ECDH_ECDSA:
++#        endif
++    case MBEDTLS_KEY_EXCHANGE_ECDHE_RSA:
+     case MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA:
+         return 1;
+     default:
+diff --git a/src/crypto/mbedtls/avs_mbedtls_prng.c b/src/crypto/mbedtls/avs_mbedtls_prng.c
+index 90bc7e4..9446055 100644
+--- a/src/crypto/mbedtls/avs_mbedtls_prng.c
++++ b/src/crypto/mbedtls/avs_mbedtls_prng.c
+@@ -19,9 +19,10 @@
+ #if defined(AVS_COMMONS_WITH_AVS_CRYPTO) && defined(AVS_COMMONS_WITH_MBEDTLS)
+ 
+ #    include <mbedtls/version.h>
+-
+-#    include <mbedtls/ctr_drbg.h>
+-#    include <mbedtls/entropy.h>
++#    if MBEDTLS_VERSION_NUMBER < 0x04000000
++#        include <mbedtls/ctr_drbg.h>
++#        include <mbedtls/entropy.h>
++#    endif
+ 
+ #    ifdef AVS_COMMONS_WITH_MBEDTLS_PSA_RNG
+ #        include <psa/crypto.h>
+@@ -39,13 +40,13 @@
+ 
+ VISIBILITY_SOURCE_BEGIN
+ 
+-#    if !defined(MBEDTLS_CTR_DRBG_C) \
++#    if (!defined(MBEDTLS_CTR_DRBG_C) || MBEDTLS_VERSION_NUMBER >= 0x04000000) \
+             && !defined(AVS_COMMONS_WITH_MBEDTLS_PSA_RNG)
+ #        error "MBEDTLS_CTR_DRBG_C must be enabled in Mbed TLS configuration if AVS_COMMONS_WITH_MBEDTLS_PSA_RNG is not enabled"
+ #    endif // !defined(MBEDTLS_CTR_DRBG_C) &&
+            // !defined(AVS_COMMONS_WITH_MBEDTLS_PSA_RNG)
+ 
+-#    ifdef MBEDTLS_CTR_DRBG_C
++#    if defined(MBEDTLS_CTR_DRBG_C) && MBEDTLS_VERSION_NUMBER < 0x04000000
+ struct avs_crypto_prng_ctx_struct {
+     avs_prng_entropy_callback_t seed_callback;
+     void *user_ptr;
+@@ -75,7 +76,7 @@ static int
+ psa_random_callback(void *ctx, unsigned char *out_buf, size_t out_buf_size) {
+     (void) ctx;
+     if (psa_generate_random(out_buf, out_buf_size) != PSA_SUCCESS) {
+-        return MBEDTLS_ERR_ENTROPY_SOURCE_FAILED;
++        return -1;
+     }
+     return 0;
+ }
+@@ -88,7 +89,7 @@ avs_crypto_prng_ctx_t *avs_crypto_prng_new(avs_prng_entropy_callback_t seed_cb,
+     }
+ 
+     avs_crypto_prng_ctx_t *ctx = NULL;
+-#    ifdef MBEDTLS_CTR_DRBG_C
++#    if defined(MBEDTLS_CTR_DRBG_C) && MBEDTLS_VERSION_NUMBER < 0x04000000
+ #        if defined(MBEDTLS_ENTROPY_C) \
+                 && !defined(AVS_COMMONS_WITH_MBEDTLS_PSA_RNG)
+     if (!seed_cb) {
+@@ -138,7 +139,10 @@ avs_crypto_prng_ctx_t *avs_crypto_prng_new(avs_prng_entropy_callback_t seed_cb,
+     }
+ #        endif     // AVS_COMMONS_WITH_MBEDTLS_PSA_RNG
+ #    else          // MBEDTLS_CTR_DRBG_C
+-    (void) seed_cb;
++    if (seed_cb) {
++        // PSA owns the RNG; per-context custom entropy is unavailable.
++        return NULL;
++    }
+     (void) user_ptr;
+     // Set output to a dummy non-null pointer
+     ctx = (avs_crypto_prng_ctx_t *) (intptr_t) "";
+@@ -149,7 +153,7 @@ avs_crypto_prng_ctx_t *avs_crypto_prng_new(avs_prng_entropy_callback_t seed_cb,
+ 
+ void avs_crypto_prng_free(avs_crypto_prng_ctx_t **ctx) {
+     if (ctx && *ctx) {
+-#    ifdef MBEDTLS_CTR_DRBG_C
++#    if defined(MBEDTLS_CTR_DRBG_C) && MBEDTLS_VERSION_NUMBER < 0x04000000
+         mbedtls_ctr_drbg_free(&(*ctx)->mbedtls_prng_ctx);
+ #        if defined(MBEDTLS_ENTROPY_C) \
+                 && !defined(AVS_COMMONS_WITH_MBEDTLS_PSA_RNG)
+@@ -170,7 +174,7 @@ int _avs_crypto_prng_get_random_cb(avs_crypto_prng_ctx_t *ctx,
+     if (!ctx) {
+         return -1;
+     }
+-#    ifdef MBEDTLS_CTR_DRBG_C
++#    if defined(MBEDTLS_CTR_DRBG_C) && MBEDTLS_VERSION_NUMBER < 0x04000000
+ #        if defined(AVS_COMMONS_WITH_MBEDTLS_PSA_RNG) \
+                 || !defined(MBEDTLS_ENTROPY_C)
+     if (ctx->seed_callback)
+diff --git a/src/net/mbedtls/avs_mbedtls_socket.c b/src/net/mbedtls/avs_mbedtls_socket.c
+index 6d5980d..0c255c3 100644
+--- a/src/net/mbedtls/avs_mbedtls_socket.c
++++ b/src/net/mbedtls/avs_mbedtls_socket.c
+@@ -36,10 +36,12 @@
+ #        define inline
+ #    endif
+ 
+-#    include <mbedtls/ctr_drbg.h>
+-#    include <mbedtls/entropy.h>
+-#    include <mbedtls/platform.h>
+ #    include <mbedtls/version.h>
++#    if MBEDTLS_VERSION_NUMBER < 0x04000000
++#        include <mbedtls/ctr_drbg.h>
++#        include <mbedtls/entropy.h>
++#    endif
++#    include <mbedtls/platform.h>
+ #    if MBEDTLS_VERSION_NUMBER >= 0x02040000 // mbed TLS 2.4 deprecated net.h
+ #        include <mbedtls/net_sockets.h>
+ #    else // support mbed TLS <=2.3
+@@ -332,6 +334,14 @@ static avs_error_t get_dtls_overhead(ssl_socket_t *socket,
+         return avs_errno(AVS_EBADF);
+     }
+ 
++#    if MBEDTLS_VERSION_NUMBER >= 0x04000000
++    // The public API reports an upper bound including maximum CBC padding.
++    // Subtract that whole bound instead of inspecting removed cipher internals.
++    if (result < 0) {
++        return avs_errno(AVS_EBADF);
++    }
++    *out_padding_size = 0;
++#    else
+     const mbedtls_cipher_info_t *cipher =
+             _avs_crypto_mbedtls_cipher_info_from_ciphersuite(ciphersuite);
+     if (!cipher) {
+@@ -347,6 +357,7 @@ static avs_error_t get_dtls_overhead(ssl_socket_t *socket,
+         result -= *out_padding_size;
+     }
+ 
++#    endif
+     *out_header = result;
+     return AVS_OK;
+ }
+@@ -1110,7 +1121,9 @@ configure_ssl(ssl_socket_t *socket,
+         return avs_errno(AVS_EINVAL);
+     }
+     assert(random_cb);
++#    if MBEDTLS_VERSION_NUMBER < 0x04000000
+     mbedtls_ssl_conf_rng(&socket->config, random_cb, random_cb_arg);
++#    endif // Mbed TLS 4 uses the initialized PSA RNG internally.
+ 
+     if (socket_set_dtls_handshake_timeouts(
+                 socket, configuration->dtls_handshake_timeouts)) {
