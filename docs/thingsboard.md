@@ -146,3 +146,24 @@ new timestamps roughly every five seconds, including unchanged values. A CoAP
 acknowledgement confirms protocol receipt; check stored telemetry separately.
 See [hardware validation scope](../tests/README.md#hardware-validation-scope)
 for tested behavior and limitations.
+
+## Firmware updates
+
+The application supports ThingsBoard's native **Object 5 / Resource 0 binary
+push** strategy over its existing X.509 DTLS session. Follow [OTA setup](ota.md)
+for the additional observations, package version/tag values, first USB
+installation and rollback behavior. Object 5 and Device Object 3 use object
+version 1.0; sensor objects retain version 1.1.
+
+Use [ota-telemetry-mapping.json](../thingsboard/ota-telemetry-mapping.json) for
+the combined sensor and OTA observations. It preserves the sensor mapping
+above and adds firmware version and the complete Object 5 instance. OTA
+resources are not added to the sensor telemetry list. ThingsBoard's native OTA
+service also emits its own `fw_state` and `lwm2m_log` status telemetry. This
+operational status is separate from the two persisted sensor measurements.
+
+Assigning a firmware package can immediately start its transfer and
+installation: the reviewed 4.4.0-SNAPSHOT transport automatically executes
+`/5/0/2` after receiving State = Downloaded. Schedule the assignment itself for
+the intended maintenance window. The prior X.509 and sensor integration results
+do not establish OTA validation on a live server or physical board.

@@ -1,3 +1,15 @@
+diff --git a/Kconfig b/Kconfig
+index 0669485..72dfd8f 100644
+--- a/Kconfig
++++ b/Kconfig
+@@ -327,7 +327,6 @@ config ANJAY_WITH_MODULE_SERVER
+ config ANJAY_WITH_MODULE_FW_UPDATE
+     bool "Enable fw_update module"
+     default y
+-    depends on ANJAY_WITH_DOWNLOADER
+ 
+ config ANJAY_WITH_MODULE_ADVANCED_FW_UPDATE
+     bool "Enable advanced_fw_update module"
 diff --git a/config/avsystem/commons/avs_commons_config.h b/config/avsystem/commons/avs_commons_config.h
 index 16d8bce..40d7752 100644
 --- a/config/avsystem/commons/avs_commons_config.h

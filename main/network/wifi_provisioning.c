@@ -9,6 +9,7 @@
 #include "esp_system.h"
 #include "esp_netif.h"
 #include "nvs_flash.h"
+#include "maintenance/firmware_update.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -122,6 +123,11 @@ void wifi_provisioning_start(void)
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
+        /* A candidate must not destroy Wi-Fi credentials or the OTA journal
+         * when an NVS migration fails. Reset lets the bootloader roll back. */
+        if (firmware_update_boot_pending()) {
+            ESP_ERROR_CHECK(ret);
+        }
         ESP_ERROR_CHECK(nvs_flash_erase());
         ESP_ERROR_CHECK(nvs_flash_init());
     }

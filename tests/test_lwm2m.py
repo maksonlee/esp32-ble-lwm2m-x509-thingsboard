@@ -104,11 +104,11 @@ def decode_coap(data):
         header = data[position]; position += 1
         parts = []
         for nibble in (header >> 4, header & 15):
+            assert nibble != 15
             if nibble == 13:
                 nibble = 13 + data[position]; position += 1
             elif nibble == 14:
                 nibble = 269 + int.from_bytes(data[position:position + 2], "big"); position += 2
-            assert nibble != 15
             parts.append(nibble)
         number += parts[0]
         options.append((number, data[position:position + parts[1]]))

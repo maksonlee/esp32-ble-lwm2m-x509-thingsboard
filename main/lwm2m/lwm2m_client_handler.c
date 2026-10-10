@@ -1,5 +1,6 @@
 #include "lwm2m_client_handler.h"
 #include "lwm2m_sensor.h"
+#include "lwm2m_firmware.h"
 #include "storage/cert_manager.h"
 #include "network/time_sync.h"
 #include "esp_log.h"
@@ -64,6 +65,7 @@ static void stop_client(void)
         anjay_delete(client);
         client = NULL;
     }
+    lwm2m_firmware_disconnect();
     lwm2m_sensors_invalidate(sensors);
     cert_manager_free();
 }
@@ -123,7 +125,8 @@ static bool start_client(void)
             || anjay_server_object_install(client)
             || anjay_security_object_add_instance(client, &security, &security_iid)
             || anjay_server_object_add_instance(client, &server, &server_iid)
-            || lwm2m_sensors_install(client, sensors)) {
+            || lwm2m_sensors_install(client, sensors)
+            || lwm2m_firmware_install(client)) {
         stop_client();
         return false;
     }
@@ -173,6 +176,9 @@ static void lwm2m_worker(void *argument)
                 break;
             }
             bool ready = registered();
+            if (ready) {
+                lwm2m_firmware_registered(client);
+            }
             int64_t now = esp_timer_get_time();
             if (ready != connected) {
                 connected = ready;

@@ -45,11 +45,12 @@ class BuildContractTests(unittest.TestCase):
                        "MBEDTLS_SSL_PROTO_DTLS",
                        "ANJAY_WITH_LWM2M11", "ANJAY_WITH_CBOR",
                        "ANJAY_WITH_SECURITY_STRUCTURED",
+                       "ANJAY_WITH_MODULE_FW_UPDATE", "BOOTLOADER_APP_ROLLBACK_ENABLE",
                        "ANJAY_WITH_OBSERVE"):
             with self.subTest(option=option):
                 self.assertIs(self.config[option], True)
         for option in ("ANJAY_WITH_DOWNLOADER", "ANJAY_WITH_BOOTSTRAP",
-                       "ANJAY_WITH_MODULE_FW_UPDATE", "ANJAY_WITH_MODULE_ADVANCED_FW_UPDATE",
+                       "ANJAY_WITHOUT_MODULE_FW_UPDATE_PUSH_MODE", "ANJAY_WITH_MODULE_ADVANCED_FW_UPDATE",
                        "ANJAY_WITH_MODULE_SW_MGMT", "ANJAY_LIBRARY_WITH_TRACE_LOGS"):
             with self.subTest(option=option):
                 self.assertFalse(self.config.get(option))

@@ -24,7 +24,7 @@ Other checks compile the actual C implementation against failure-injection
 substitutes and test USB safeguards with mocks. Disposable PKI fixtures are
 generated in temporary directories and removed when each test completes.
 
-The application suite contains 24 tests:
+The application suite covers:
 
 | Area | Tests | Coverage |
 | --- | --- | --- |
@@ -33,6 +33,8 @@ The application suite contains 24 tests:
 | Certificates | 9 | Chain order, key/CN matching, validity, permissions, PEM content, symlinks and independent server trust |
 | USB maintenance | 5 | Target identity, partition compatibility, certificate-only writes, storage requirements and endpoint matching |
 | LwM2M | 2 | Startup failures, registration gating, disconnect races, sampling intervals and CoAP/TLV observations |
+| OTA platform | 6 | Split image headers, target/version checks, size/integrity, Flash failures, NVS ordering, restart recovery and confirmation deadlines with ASan/UBSan |
+| OTA wire | 7 | Real Anjay Object 3/5, CoAP Block1 push/retransmission/interruption, cancellation, error mapping, Execute and persistent-result handoff |
 
 Focused checks can be run with, for example:
 
@@ -44,6 +46,49 @@ The LwM2M test builds its OpenSSL-backed Anjay directly from the root pinned
 sources. Its NoSec UDP peer is restricted to 127.0.0.1. It checks registration
 version/object links and actual TLV Observe notifications, equal successive
 readings, failed-read suppression and recovery. Firmware requires X.509 DTLS.
+
+## OTA checks
+
+Run the focused checks before the full application suite:
+
+```sh
+python -m unittest discover -s tests -p test_ota.py -v
+python -m unittest discover -s tests -p test_ota_wire.py -v
+```
+
+`tests/ota/` compiles the actual `main/maintenance/firmware_update.c` against
+isolated ESP-IDF substitutes. It verifies arbitrary header chunk boundaries,
+rejection before Flash writes, capacity and exact image length, SDK failure
+cleanup, cancellation, disconnected transfers, retained downloaded packages,
+and retry after a failed Execute. Simulated cold boots retain only fake NVS:
+tests check journal commit before boot selection, rollback reporting, and
+mark-valid before success persistence. The independent 180-second boot deadline
+is tested without a network; local startup and registration must permit
+confirmation before it expires. These tests exercise application decisions;
+the substitutes do not validate a real ESP32 binary or physically erase Flash.
+
+The OTA wire test links the actual LwM2M bridge with pinned Anjay and a fake
+platform. Its independent loopback peer checks Object 3 version/binding and
+Object 5 state/results, push-only delivery, rejected URI pull, exact transferred
+bytes, duplicate Block1 packets, cancellation and invalid-image/space/memory
+failures. It checks that Anjay's cleanup callbacks preserve an update result
+reported after reboot. The transport is NoSec on 127.0.0.1 only; application
+firmware continues to require X.509 DTLS.
+
+Application build contracts require the rollback-enabled bootloader and
+push-only firmware-update module and verify both unchanged slot sizes. The
+ESP32 DTLS emulator suite below tests crypto separately; it does not qualify
+OTA Flash writes, boot selection or rollback.
+
+Before deploying OTA, validate a full USB baseline and two differently
+versioned application images on the exact intended board and test device.
+Verify native ThingsBoard assignment/automatic Execute, updated version,
+success result and fresh sensor telemetry. Then test transfer interruption,
+power loss before/after boot selection, candidate startup failure, the
+180-second network/NTP/registration deadline, rollback reporting and a later
+successful retry. Compare retained Wi-Fi configuration, certificate bundle and
+PoP through the authorized maintenance workflow. These physical/server OTA
+checks have not been performed; earlier hardware results below predate OTA.
 
 ## ESP32 DTLS regression suite
 

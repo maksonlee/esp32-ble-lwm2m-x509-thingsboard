@@ -64,6 +64,11 @@ retries; exhausted connections recreate the client after a five-second delay.
 Network changes close the old client and clear pending notifications before a
 fresh registration. Connection events do not create additional tasks.
 
+An interrupted OTA upload is aborted when the client disconnects; retry the
+complete package. A fully validated package awaiting Execute survives client
+recreation within the same boot. Reboot discards packages that have not been
+selected for installation. See [OTA](ota.md) for installation and rollback.
+
 Losing the DHCP address also pauses sampling even if the Wi-Fi radio remains
 associated. A sample is not submitted until IP availability and a valid LwM2M
 registration are present, including a connection change during a sensor read.
@@ -133,6 +138,14 @@ bootloader, partition table, OTA metadata, application, and SPIFFS together; NVS
 is preserved. Resetting OTA metadata intentionally selects the freshly written
 OTA slot 0. Do not use this tool on an encrypted or secure-boot production board.
 
+Use this full USB workflow for the first OTA-capable installation: both the
+application and bootloader must be built with
+`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y`. An application-only USB write cannot
+enable rollback in an older bootloader. Verify normal startup and registration
+before assigning a remote firmware package. OTA keeps both existing slot sizes
+and writes only the inactive application slot; certificate renewal continues to
+use the USB workflow below.
+
 For certificate renewal:
 
 1. Obtain a new device key/certificate using the issuing CA's renewal workflow.
@@ -153,4 +166,5 @@ For certificate renewal:
 
 SPIFFS replacement is not atomic across power loss. If interrupted, restore the
 previous validated bundle over USB; Wi-Fi NVS is not part of the write. This is
-the supported maintenance workflow. Remote OTA is not implemented.
+the supported certificate-maintenance workflow. For application-only remote
+updates and recovery from a rejected candidate, use [OTA](ota.md).

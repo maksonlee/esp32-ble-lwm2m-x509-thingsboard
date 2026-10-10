@@ -10,7 +10,10 @@ auto-creation was verified with a Linux Anjay client and a separate new RSA
 identity on the ESP32 against the patched 4.4.0 server. Both clients passed
 same-device reconnection and delivered fresh temperature/humidity telemetry.
 The application uses X.509 DTLS, LwM2M 1.1 and standard Temperature/Humidity
-objects. It does not implement OTA or Object 5.
+objects. OTA adds Anjay's Firmware Update Object 5 (object version 1.0) and a
+minimal Device Object 3 (version 1.0). The LwM2M protocol remains 1.1. The
+previous physical/server results below cover telemetry and provisioning;
+physical OTA transfer and rollback have not yet been qualified.
 
 Physical regression checks also passed two BOOT-triggered BLE Wi-Fi
 reprovisioning cycles with Espressif Security 1 and a host BLE client. Device
@@ -54,6 +57,14 @@ The component selects GNU C99 because GCC 15 otherwise defaults to C23. It
 retains the reference adapter's alignment-assertion workaround only inside
 Anjay; application/test assertions remain enabled. HTTP and download support
 are disabled, so the legacy HTTP Digest MD5 stream library is excluded.
+Anjay's firmware-update module is enabled for CoAP block-wise push through
+Object 5; URI pull remains disabled. The adapter patch removes its unnecessary
+Kconfig dependency on the downloader so push can be enabled independently.
+The application streams the package into
+ESP-IDF's inactive OTA partition with `esp_ota_begin`, `esp_ota_write` and
+`esp_ota_end`, then selects it only after a valid Execute request. ESP-IDF's
+rollback-enabled bootloader and application confirmation use the existing
+partition layout. No dependency revisions are changed for OTA.
 
 These patches qualify the tested configuration, not every crypto feature,
 session-resumption path or downstream application. See [tests](../tests/README.md)
@@ -83,5 +94,11 @@ mapping and the pre-created endpoint alternative.
 
 MQTT authentication alone does not prove that the same server identity, trust
 roots or client-credential mode will work for DTLS.
+
+ThingsBoard's native Object 5 binary strategy and automatic Execute on the
+Downloaded state were reviewed in the 4.4.0-SNAPSHOT transport source. Source
+review establishes the intended integration, not a successful server/device
+OTA test. The required profile observations, package metadata and recovery
+policy are described in [OTA setup](ota.md).
 
 Dependency licensing is described in [third-party notices](../THIRD_PARTY_NOTICES.md).

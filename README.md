@@ -5,8 +5,10 @@ It provisions Wi-Fi over BLE and reports temperature and humidity to ThingsBoard
 using Anjay, LwM2M 1.1 and X.509 DTLS.
 
 Features include per-device BLE proof of possession, time synchronization before
-DTLS, BOOT long-press Wi-Fi reset, and USB firmware and certificate maintenance.
-Device credentials are retained during Wi-Fi reprovisioning. OTA is not implemented.
+DTLS, BOOT long-press Wi-Fi reset, USB firmware and certificate maintenance, and
+ThingsBoard firmware updates through LwM2M Object 5. OTA uses the existing two
+application slots and ESP-IDF rollback. Device credentials are retained during
+Wi-Fi reprovisioning and OTA.
 
 **Licensing:** application code is MIT; Anjay/avs_coap use AVSystem's
 Non-Commercial License. Commercial use needs a separate AVSystem license.
@@ -63,6 +65,12 @@ Settings are saved in ignored `sdkconfig`. Dependency downloads, managed
 components, build output and credentials are also excluded from Git.
 Application builds do not read or embed device credentials.
 
+OTA requires `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y`,
+`CONFIG_ANJAY_WITH_MODULE_FW_UPDATE=y` and `CONFIG_ANJAY_WITH_DOWNLOADER=n`.
+Check existing saved configurations as well as new builds; `sdkconfig.defaults`
+does not override saved settings. The initial USB installation must include
+the rebuilt bootloader. See [OTA setup](docs/ota.md) before preparing an update.
+
 ## Configure ThingsBoard and flash over USB
 
 Follow [ThingsBoard setup](docs/thingsboard.md) to configure X.509 CA/CN
@@ -102,6 +110,20 @@ Wi-Fi settings and re-enter provisioning. Device credentials and PoP are retaine
 See [maintenance](docs/maintenance.md) for certificate-only updates and recovery,
 and [security boundaries](docs/security.md) for plaintext SPIFFS storage limits.
 
+## Firmware updates over LwM2M
+
+Follow [OTA setup and recovery](docs/ota.md) to configure ThingsBoard's native
+Object 5 binary push and upload the raw `build/wifi_prov_mgr.bin` application.
+Use firmware versions `v01`, `v02`, `v03`, and so on (`v01` is the default).
+Build each package with a distinct version and the intended device's endpoint
+and configuration. Each application slot is `0x1d0000` bytes; OTA does not update
+the bootloader, partition table or device credentials.
+
+A candidate must complete local startup and register with ThingsBoard over
+X.509 DTLS within 180 seconds of application startup. Otherwise it rolls back
+to the previous application. This version uses DTLS and ESP-IDF image integrity
+checks; independent firmware signing and Secure Boot remain outside its scope.
+
 ## Verification
 
 ```sh
@@ -120,6 +142,9 @@ on ThingsBoard 4.4.0 with PR #16179. BOOT-triggered BLE reprovisioning passed wi
 a host BLE client, including rejected enrollment credentials, recovery and
 retention of device credentials and PoP.
 Mobile provisioning apps and extended failure/recovery remain unverified.
+OTA transfer, power interruption and rollback on physical hardware with
+ThingsBoard require separate validation; earlier sensor/provisioning checks
+do not qualify OTA.
 See [test coverage and limitations](tests/README.md) for details.
 
 ## Repository layout
@@ -127,16 +152,16 @@ See [test coverage and limitations](tests/README.md) for details.
 ```text
 main/                     Application (one ESP-IDF component)
   app_main.c              Startup and task initialization
-  lwm2m/                  Anjay client and sensor objects
+  lwm2m/                  Anjay client, sensor objects and firmware-update object
   network/                BLE Wi-Fi provisioning and time synchronization
   sensors/                DHT11 driver and frame decoder
   storage/                SPIFFS access and certificate loading
-  maintenance/            BOOT button and long-press handling
+  maintenance/            BOOT button, OTA flash writes and boot confirmation
 components/anjay/         SDK integration and compatibility patches
 tools/                    Dependency preparation and USB maintenance
 tests/                    Host checks and ESP32 DTLS regression tests
 thingsboard/              Sensor mapping configuration
-docs/                     Compatibility, server setup, maintenance and security
+docs/                     Compatibility, server setup, OTA, maintenance and security
 licenses/                 Retained upstream license texts
 ```
 

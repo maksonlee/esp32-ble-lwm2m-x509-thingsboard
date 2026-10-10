@@ -13,6 +13,35 @@ This does not protect a private key from physical flash extraction. SPIFFS store
 the key in plaintext, and this development build has neither Secure Boot nor
 Flash Encryption enabled.
 
+## OTA trust and recovery
+
+Firmware packages arrive through the existing mutually authenticated X.509
+DTLS session with ThingsBoard. Anjay implements Object 5 binary push; there is
+no HTTP/CoAP Package URI downloader or separate unauthenticated update listener.
+ESP-IDF checks the application image before the boot partition is changed.
+The application also checks the ESP32 target, available slot space, image
+length and project identity. See [OTA](ota.md) for the accepted artifact.
+
+These images have no independent firmware signature. DTLS authenticates the
+configured server and protects the transfer, while the ESP image checksum/hash
+detects corruption. Neither supplies an independent publisher identity when
+ThingsBoard or its trusted server credentials are compromised. Restrict OTA
+package upload and assignment to authorized ThingsBoard users. The server is
+trusted to select the correct device configuration and application behavior.
+
+Rollback is a recovery mechanism, not anti-rollback security. A candidate is
+confirmed only after local startup and authenticated LwM2M registration within
+180 seconds of application startup. Network or server outages during that
+window can reject an otherwise functional candidate. Confirmation does not
+prove sensor accuracy, telemetry persistence or long-term application health.
+Older firmware with a different version can still be installed; no eFuse
+security-version policy or independent signature enforcement is enabled.
+
+OTA preserves the partition table, NVS Wi-Fi credentials, SPIFFS credentials and
+PoP. Build-time endpoint and network settings are part of the new application;
+they must still match the intended device. Bootloader, partition changes and
+certificate renewal use USB. Keep a verified USB recovery bundle available.
+
 ## Before enabling hardware security
 
 ESP-IDF's SPIFFS driver rejects encrypted partitions. Adding `encrypted` to the
