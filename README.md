@@ -143,9 +143,10 @@ on ThingsBoard 4.4.0 with PR #16179. BOOT-triggered BLE reprovisioning passed wi
 a host BLE client, including rejected enrollment credentials, recovery and
 retention of device credentials and PoP.
 Mobile provisioning apps and extended failure/recovery remain unverified.
-OTA transfer, power interruption and rollback on physical hardware with
-ThingsBoard require separate validation; earlier sensor/provisioning checks
-do not qualify OTA.
+A physical `v01` to `v02` OTA update passed ThingsBoard assignment, binary
+transfer, automatic installation, boot confirmation and fresh sensor delivery.
+Power interruption, malformed-image rejection and rollback on physical hardware
+remain unverified.
 See [test coverage and limitations](tests/README.md) for details.
 
 ## Repository layout

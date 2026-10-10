@@ -11,9 +11,12 @@ identity on the ESP32 against the patched 4.4.0 server. Both clients passed
 same-device reconnection and delivered fresh temperature/humidity telemetry.
 The application uses X.509 DTLS, LwM2M 1.1 and standard Temperature/Humidity
 objects. OTA adds Anjay's Firmware Update Object 5 (object version 1.0) and a
-minimal Device Object 3 (version 1.0). The LwM2M protocol remains 1.1. The
-previous physical/server results below cover telemetry and provisioning;
-physical OTA transfer and rollback have not yet been qualified.
+minimal Device Object 3. Neither object advertises an explicit version;
+ThingsBoard's Leshan 2.0.0-M15 resolves Device Object 3 as version 1.1 and
+Firmware Update Object 5 as version 1.0 for LwM2M 1.1 registration. Use the
+corresponding versioned paths in [OTA mappings and RPC](ota.md). A physical
+`v01` to `v02` update passed transfer, automatic installation, boot confirmation
+and fresh telemetry. Power interruption and physical rollback remain unverified.
 
 Physical regression checks also passed two BOOT-triggered BLE Wi-Fi
 reprovisioning cycles with Espressif Security 1 and a host BLE client. Device
@@ -96,9 +99,11 @@ MQTT authentication alone does not prove that the same server identity, trust
 roots or client-credential mode will work for DTLS.
 
 ThingsBoard's native Object 5 binary strategy and automatic Execute on the
-Downloaded state were reviewed in the 4.4.0-SNAPSHOT transport source. Source
-review establishes the intended integration, not a successful server/device
-OTA test. The required profile observations, package metadata and recovery
-policy are described in [OTA setup](ota.md).
+Downloaded state were reviewed in the 4.4.0-SNAPSHOT transport source and passed
+the physical `v01` to `v02` test. This validates the normal update path;
+failure and rollback coverage remains limited to the automated tests described
+in [test coverage](../tests/README.md). The required model versions, profile
+observations, package metadata and recovery policy are described in
+[OTA setup](ota.md).
 
 Dependency licensing is described in [third-party notices](../THIRD_PARTY_NOTICES.md).

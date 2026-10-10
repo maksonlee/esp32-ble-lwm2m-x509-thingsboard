@@ -80,15 +80,27 @@ push-only firmware-update module and verify both unchanged slot sizes. The
 ESP32 DTLS emulator suite below tests crypto separately; it does not qualify
 OTA Flash writes, boot selection or rollback.
 
-Before deploying OTA, validate a full USB baseline and two differently
-versioned application images on the exact intended board and test device.
-Verify native ThingsBoard assignment/automatic Execute, updated version,
-success result and fresh sensor telemetry. Then test transfer interruption,
-power loss before/after boot selection, candidate startup failure, the
-180-second network/NTP/registration deadline, rollback reporting and a later
-successful retry. Compare retained Wi-Fi configuration, certificate bundle and
-PoP through the authorized maintenance workflow. These physical/server OTA
-checks have not been performed; earlier hardware results below predate OTA.
+On 2026-10-10, a separate physical/server check passed the normal `v01` to `v02`
+update on the original ESP32 with 4 MiB flash and ESP-IDF 6.1, using ThingsBoard's
+4.4.0-SNAPSHOT LwM2M transport. It began with a full `v01` USB installation,
+including the rollback-enabled bootloader, and fresh X.509 DTLS registration
+and sensor readings. ThingsBoard had the matching Device 1.1 and Firmware
+Update 1.0 models and the [combined OTA observations](../thingsboard/ota-telemetry-mapping.json).
+
+Assigning the `v02` package to that device transferred the application and
+automatically executed installation. Serial output confirmed `v02` running in
+`ota_1` and firmware confirmation after server registration. Fresh LwM2M Reads
+reported running version `v02`, Firmware Update State `0` and Update Result `1`.
+Two fresh temperature/humidity readings followed reconnection. These results
+qualify the normal physical update path; they are separate from the host tests
+and do not establish physical rollback behavior.
+
+Still validate malformed-image rejection, transfer interruption, power loss
+before/after boot selection, candidate startup failure, the 180-second
+network/NTP/registration deadline, rollback reporting and a later successful
+retry on hardware. Compare retained Wi-Fi configuration, certificate bundle
+and PoP through the authorized maintenance workflow. Earlier hardware results
+below cover telemetry/provisioning and do not extend this OTA failure coverage.
 
 ## ESP32 DTLS regression suite
 

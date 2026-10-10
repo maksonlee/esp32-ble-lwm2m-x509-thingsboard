@@ -10,10 +10,11 @@ Transfers share the application's LwM2M worker with sensor access. Sensor
 sampling can pause while Anjay receives the package and Flash is written;
 normal sampling resumes afterward, without publishing cached readings.
 
-The feature targets the original ESP32, 4 MiB flash and ESP-IDF 6.1. Physical
-OTA transfer, power interruption and rollback against ThingsBoard have not yet
-been validated. See [test coverage](../tests/README.md) for automated coverage
-and the separate, earlier telemetry/provisioning hardware results.
+The feature targets the original ESP32, 4 MiB flash and ESP-IDF 6.1. A physical
+`v01` to `v02` update through ThingsBoard passed binary transfer, automatic
+installation, boot confirmation and fresh sensor delivery. Power interruption,
+malformed-image rejection and physical rollback remain unverified. See
+[test coverage](../tests/README.md) for the precise automated and hardware scope.
 
 ## Install the OTA baseline over USB
 
@@ -91,9 +92,28 @@ Set `profileData.transportConfiguration.observeAttr` to
 [ota-telemetry-mapping.json](../thingsboard/ota-telemetry-mapping.json), preserving
 the other profile settings. This combined mapping keeps the existing
 temperature/humidity telemetry and whole-instance sensor observations, then
-adds `/3_1.0/0/3` and the complete `/5_1.0/0` instance. It uses **Single**
-observation and keeps `initAttrTelAsObsStrategy` false. Object 3 and Object 5
-are version 1.0 even though the LwM2M protocol and sensor objects use version 1.1.
+adds `/3_1.1/0/3` and the complete `/5_1.0/0` instance. It uses **Single**
+observation and keeps `initAttrTelAsObsStrategy` false. The firmware omits an
+explicit object version for Device Object 3 and Firmware Update Object 5.
+With LwM2M 1.1 registration, ThingsBoard's Leshan 2.0.0-M15
+[core-object version registry](https://github.com/eclipse-leshan/leshan/blob/leshan-2.0.0-M15/leshan-core/src/main/java/org/eclipse/leshan/core/model/LwM2mCoreObjectVersionRegistry.java)
+therefore resolves Device Object 3 as version 1.1 and Firmware Update Object 5
+as version 1.0. Use those resolved versions in ThingsBoard mappings and RPC
+paths; the protocol and sensor objects remain version 1.1.
+
+Before assigning firmware, check ThingsBoard's LwM2M model library for these
+exact object versions. If either is missing, import the corresponding XML from
+the OMA registry as a tenant LwM2M model:
+
+- [Device Object 3, version 1.1](https://raw.githubusercontent.com/OpenMobileAlliance/lwm2m-registry/prod/version_history/3-1_1.xml)
+- [Firmware Update Object 5, version 1.0](https://raw.githubusercontent.com/OpenMobileAlliance/lwm2m-registry/prod/version_history/5-1_0.xml)
+
+Keep existing model versions. A library containing only Device 1.2 and Firmware
+Update 1.1 does not supply these required versions. Without the matching models,
+ThingsBoard can decode version and state resources as opaque bytes instead of
+strings and integers, preventing its native OTA state machine from processing
+them. Verify a Read of `/3_1.1/0/3` returns a string version and `/5_1.0/0/3`
+returns an integer state before assigning the package.
 
 | Resource | Meaning |
 | --- | --- |
@@ -149,6 +169,12 @@ identifies the source commit, while ThingsBoard compares the running version.
 Inspect that resource after the update instead of inferring success from the
 package assignment alone.
 
+In ThingsBoard, read the running version with the versioned resource path:
+
+```json
+{"method": "Read", "params": {"id": "/3_1.1/0/3"}}
+```
+
 The startup log also reports the embedded project name, running version and
 application partition, for example:
 
@@ -162,8 +188,8 @@ Use this serial diagnostic alongside the reported version and update result.
 Assign the package to the specific device during its maintenance window.
 Assignment can start transfer and installation immediately. The reviewed
 ThingsBoard 4.4.0-SNAPSHOT transport automatically sends Execute `/5/0/2` when
-State becomes Downloaded. Its OTA behavior was reviewed in source, separately
-from the physical/server validation described in the other guides.
+State becomes Downloaded. This automatic installation also passed the physical
+`v01` to `v02` validation described in [test coverage](../tests/README.md).
 
 The official [LwM2M OTA guide](https://thingsboard.io/docs/reference/lwm2m-api/ota-updates/)
 also describes manual Execute. If the installed server leaves the device in
