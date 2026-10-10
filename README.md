@@ -114,7 +114,8 @@ and [security boundaries](docs/security.md) for plaintext SPIFFS storage limits.
 
 Follow [OTA setup and recovery](docs/ota.md) to configure ThingsBoard's native
 Object 5 binary push and upload the raw `build/wifi_prov_mgr.bin` application.
-Use firmware versions `v01`, `v02`, `v03`, and so on (`v01` is the default).
+Use firmware versions `v01`, `v02`, `v03`, and so on (`v02` is the current default).
+Commit and tag each release before building its OTA package; `v01` is the baseline.
 Build each package with a distinct version and the intended device's endpoint
 and configuration. Each application slot is `0x1d0000` bytes; OTA does not update
 the bootloader, partition table or device credentials.

@@ -43,19 +43,39 @@ endpoint is compiled into the image and must match that device's certificate
 CN; preserving SPIFFS alone does not make one binary suitable for every device.
 Avoid assigning one endpoint-specific image to a shared device profile.
 
-Name firmware versions `v01`, `v02`, `v03`, and so on. The baseline defaults to
-`v01`; build the next update as `v02` from an activated ESP-IDF 6.1 environment:
+Name firmware versions `v01`, `v02`, `v03`, and so on. The OTA baseline is
+`v01`; the current release defaults to `v02`.
+
+Prepare each release in this order:
+
+1. Set the `PROJECT_VER` default in `CMakeLists.txt` to the intended version,
+   finish the source/documentation changes and run the applicable checks.
+2. Commit the reviewed release files, then create an annotated Git tag with
+   that version, for example `git tag -a v02 -m "Firmware v02"`. Create each
+   release tag once and keep it on its original commit.
+3. Build the final package from that tagged commit with a clean tracked
+   worktree. From an activated ESP-IDF 6.1 environment, verify the commit/tag
+   and explicitly select the matching firmware version:
 
 ```sh
+git status --short
+git rev-parse HEAD
+git describe --exact-match --tags HEAD
 idf.py -DPROJECT_VER=v02 build
 ```
+
+Run the [release checks](../tests/README.md) on this final build before upload.
+Keep the full commit ID, tag, build configuration and binary SHA-256 with the
+private release artifacts. Any further source change requires a new commit
+and version; an already published tag or package must not be repurposed.
 
 Use the raw `build/wifi_prov_mgr.bin` file. Its embedded project name is
 `wifi_prov_mgr`, and its embedded version is the chosen `PROJECT_VER` value.
 Check the build output and package details before upload; keep the version
 within ESP-IDF's 31-character application-version limit. Reusing the running
 version is rejected even if the binary differs.
-For the following update, use `-DPROJECT_VER=v03`. Always pass the intended
+For the following update, set the source default to `v03`, commit/tag it, then
+build with `-DPROJECT_VER=v03`. Always pass the intended
 version explicitly when preparing a release; CMake remembers a previously
 supplied `PROJECT_VER` in the build directory.
 
@@ -124,8 +144,20 @@ intended device profile and upload the raw application binary. Use:
 Title and Version match the embedded application descriptor. Set Version tag
 to the exact running-version value that the new image will report at
 `/3/0/3`; ThingsBoard uses it to recognize an already-installed package.
+This ThingsBoard field and the Git release tag both use `v02`: the Git tag
+identifies the source commit, while ThingsBoard compares the running version.
 Inspect that resource after the update instead of inferring success from the
 package assignment alone.
+
+The startup log also reports the embedded project name, running version and
+application partition, for example:
+
+```text
+app_main: System init: wifi_prov_mgr v02, running partition ota_1
+```
+
+The partition can be `ota_0` or `ota_1`, depending on the previous running slot.
+Use this serial diagnostic alongside the reported version and update result.
 
 Assign the package to the specific device during its maintenance window.
 Assignment can start transfer and installation immediately. The reviewed
